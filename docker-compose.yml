@@ -1,0 +1,28 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:15.3-alpine3.18
+    container_name: kodeksa_db
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - ./vol-db:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kodeksa -d kodeksa_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5  
+    networks:
+      - backnet
+    ports:
+      - "5433:5432"
+
+networks:
+  backnet:
+    external: true
+
+volumes:
+  pgdata_dev:
