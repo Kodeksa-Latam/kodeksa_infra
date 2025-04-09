@@ -1,31 +1,42 @@
-name: Deploy Infra to VPS
+name: Deploy Infra
 
 on:
   push:
     branches:
       - master
 
+env:
+  ENV_NAME: prod
+  COMPOSE_FILE: infra/docker-compose.yml
+  DEPLOY_DIR: ~/kodeksa-infra
+
 jobs:
   deploy:
-    name: Deploy PostgreSQL infra
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Setup SSH access
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+      - name: Copy docker-compose to VPS
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          source: "infra/*"
+          target: ${{ env.DEPLOY_DIR }}
+          strip_components: 1
 
-      - name: Deploy Docker Compose to VPS
-        run: |
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-            cd /home/kenyra/kodeksa-infra
-            git pull origin master
+      - name: Deploy PostgreSQL Infra
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          script: |
+            cd ${{ env.DEPLOY_DIR }}
             docker network create backnet || true
-            docker-compose -p kodeksa-infra -f infra/docker-compose.yml up -d
-          EOF
+            docker-compose -p kodeksa-infra -f ${{ env.COMPOSE_FILE }} up -d
